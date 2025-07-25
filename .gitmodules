@@ -1,0 +1,3 @@
+[submodule "mdict"]
+	path = mdict
+	url = https://github.com/NiuGuohui/mdict-cpp.git

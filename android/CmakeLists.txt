@@ -1,0 +1,35 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(ReactNativeMdict)
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
+set(CMAKE_CXX_STANDARD 20)
+set(BUILD_SHARED_LIBS ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+
+# Compile sources
+add_library(
+        react-native-mdict
+        SHARED
+        ../cpp/Promise.cpp
+        ../cpp/JSMdict.cpp
+        ../cpp/NativeMdictModule.cpp
+)
+
+# Add headers search paths
+target_include_directories(react-native-mdict PUBLIC ../mdict)
+target_include_directories(react-native-mdict PUBLIC ../cpp)
+
+# Add litehtml core dependency
+add_subdirectory(../mdict mdict)
+
+# Add android/log dependency
+find_library(log-lib log)
+
+target_link_libraries(
+        react-native-mdict
+        mdict                        # <-- mdict
+        ${log-lib}                  # <-- Logcat logger
+        android                     # <-- Android JNI core
+        react_codegen_MdictSpec    # <-- Generated Specs from CodeGen
+)
