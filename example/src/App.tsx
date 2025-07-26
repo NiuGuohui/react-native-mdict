@@ -1,12 +1,30 @@
-import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'react-native-mdict';
-
-const result = multiply(3, 7);
+import { Text, View, StyleSheet, Button } from 'react-native';
+import { Mdict } from 'react-native-mdict';
+import { useCallback } from 'react';
 
 export default function App() {
+  const onSearch = useCallback(async () => {
+    const mdict = new Mdict(
+      '/data/data/mdict.example/files/English-Chinese-Dictionary.mdx'
+    );
+    console.log('Start');
+    let last = Date.now();
+    await mdict.init();
+    console.log(`Initialize:${Date.now() - last}`);
+    last = Date.now();
+    const res = await mdict.search('walk');
+    console.log(`Result:${Date.now() - last}`);
+    console.log(res);
+    last = Date.now();
+    const list = await mdict.keyList();
+    console.log(`KeyList:${Date.now() - last}`);
+    console.log(list);
+  }, []);
+
   return (
     <View style={styles.container}>
-      <Text>Result: {result}</Text>
+      <Text>Result: 123</Text>
+      <Button title="search" onPress={onSearch} />
     </View>
   );
 }

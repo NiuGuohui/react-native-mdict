@@ -1,53 +1,102 @@
 #include "JSMdict.h"
 #include "mdict_extern.h"
-#include <thread>
 
 namespace JSMdict {
-    using namespace facebook::jsi;
-    using namespace facebook::react;
-
-    JSMdict::JSMdict(std::string file, std::shared_ptr<CallInvoker> _jsInvoker)
-            : filePath(file),
-              mdict(new mdict::Mdict(file)),
-              jsInvoker(std::weak_ptr<CallInvoker>(_jsInvoker)) {
+    JSMdict::JSMdict(std::string file, std::shared_ptr<react::CallInvoker> jsInvoker)
+            : mdict(new mdict::Mdict(file)),
+              jsInvoker(std::weak_ptr<react::CallInvoker>(jsInvoker)),
+              threadPool(CancellableThreadPool(std::thread::hardware_concurrency())) {
     }
 
-    std::vector<PropNameID> JSMdict::getPropertyNames(Runtime &rt) {
-        std::vector<PropNameID> vec;
+    JSMdict::~JSMdict() {
+        initialized = false;
+        jsInvoker.reset();
+        threadPool.cancel(currentSearchTaskId);
+        threadPool.stop();
+        delete mdict;
+    }
+
+    std::vector<jsi::PropNameID> JSMdict::getPropertyNames(jsi::Runtime &rt) {
+        std::vector<jsi::PropNameID> vec;
         vec.reserve(1);
-        vec.push_back(PropNameID::forAscii(rt, "search"));
+        vec.push_back(jsi::PropNameID::forAscii(rt, "search"));
         return vec;
     }
 
-    Value JSMdict::get(Runtime &runtime, const PropNameID &name) {
-        if (name.utf8(runtime) == "search") {
-            return Function::createFromHostFunction(
+    jsi::Value JSMdict::get(jsi::Runtime &runtime, const jsi::PropNameID &name) {
+        if (name.utf8(runtime) == "init") {
+            return jsi::Function::createFromHostFunction(
                     runtime,
-                    PropNameID::forAscii(runtime, "search"),
+                    jsi::PropNameID::forAscii(runtime, "init"),
+                    0,
+                    [this](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *args, size_t count) {
+                        return init(runtime);
+                    }
+            );
+        } else if (name.utf8(runtime) == "search") {
+            return jsi::Function::createFromHostFunction(
+                    runtime,
+                    jsi::PropNameID::forAscii(runtime, "search"),
                     1,
-                    [this](Runtime &runtime, const Value &thisValue, const Value *args, size_t count) -> Value {
+                    [this](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *args, size_t count) {
                         if (!args[0].isString()) {
-                            throw JSError(runtime, "Invalid argument of index 0");
+                            throw jsi::JSError(runtime, "Invalid argument of index 0");
                         }
                         return search(runtime, args[0].getString(runtime).utf8(runtime));
-                    });
+                    }
+            );
+        } else if (name.utf8(runtime) == "keyList") {
+            return jsi::Function::createFromHostFunction(
+                    runtime,
+                    jsi::PropNameID::forAscii(runtime, "keyList"),
+                    0,
+                    [this](jsi::Runtime &runtime, const jsi::Value &thisValue, const jsi::Value *args, size_t count) {
+                        return keyList(runtime);
+                    }
+            );
         }
-        return Value::undefined();
+        return jsi::Value::undefined();
     }
 
-    Value JSMdict::search(Runtime &runtime, std::string value) {
-        try {
-            mdict->init();
-        } catch (std::exception &e) {
-//            return Promise::createPromise(runtime,
-//                                   jsInvoker.lock(),
-//                                   [this, &runtime](std::shared_ptr<Promise> promise) {
-//
-//                                   });
-        }
-        auto s = mdict->lookup(value);
-        if (s.empty()) return Value::undefined();
-        return Value(runtime, String::createFromUtf8(runtime, s));
+    jsi::Value JSMdict::init(jsi::Runtime &runtime) {
+        return Promise::createPromise(runtime, jsInvoker.lock(), [&](const std::shared_ptr<Promise> &promise) {
+            threadPool.enqueue([&, promise]() {
+                try {
+                    mdict->init();
+                    initialized = true;
+                    promise->resolve(jsi::Value::undefined());
+                } catch (std::exception &e) {
+                    promise->reject(e.what());
+                }
+            });
+        });
+    }
+
+    jsi::Value JSMdict::search(jsi::Runtime &runtime, std::string value) {
+        checkInitialized(runtime);
+        return Promise::createPromise(runtime, jsInvoker.lock(), [&, value](const std::shared_ptr<Promise> &promise) {
+            threadPool.cancel(currentSearchTaskId);
+            currentSearchTaskId = threadPool.enqueue([&, promise]() {
+                auto s = mdict->lookup(value);
+                if (s.empty()) promise->resolve(jsi::Value::undefined());
+                else promise->resolve(jsi::Value(runtime, jsi::String::createFromUtf8(runtime, s)));
+            });
+        });
+    }
+
+    jsi::Value JSMdict::keyList(jsi::Runtime &runtime) {
+        checkInitialized(runtime);
+        runtime.global();
+        return Promise::createPromise(runtime, jsInvoker.lock(), [&](const std::shared_ptr<Promise> &promise) {
+            threadPool.enqueue([&, promise]() {
+                auto keys = mdict->keyList();
+                jsi::Array arr(runtime, keys.size());
+                for (int i = 0; i < keys.size(); i++) {
+                    arr.setValueAtIndex(runtime, i, jsi::String::createFromAscii(runtime, keys[i]->key_word));
+                }
+                promise->resolve(jsi::Value(runtime, arr));
+            });
+        });
     }
 
 }
