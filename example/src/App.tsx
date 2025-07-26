@@ -12,11 +12,11 @@ export default function App() {
     await mdict.init();
     console.log(`Initialize:${Date.now() - last}`);
     last = Date.now();
-    const res = await mdict.search('walk');
+    const res = await mdict.search('sadasd');
     console.log(`Result:${Date.now() - last}`);
     console.log(res);
     last = Date.now();
-    const list = await mdict.keyList();
+    const list = await mdict.keyList('ab');
     console.log(`KeyList:${Date.now() - last}`);
     console.log(list);
   }, []);

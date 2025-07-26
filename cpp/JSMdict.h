@@ -21,9 +21,9 @@ namespace JSMdict {
 
         jsi::Value init(jsi::Runtime &runtime);
 
-        jsi::Value keyList(jsi::Runtime &runtime);
+        jsi::Value keyList(jsi::Runtime &runtime, std::string query);
 
-        jsi::Value search(jsi::Runtime &runtime, std::string value);
+        jsi::Value lookup(jsi::Runtime &runtime, std::string value);
 
     private:
         mdict::Mdict *mdict;

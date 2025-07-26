@@ -45,10 +45,7 @@ namespace JSMdict {
                 task = std::move(tasks_[taskId]);
             }
 
-            try {
-                task();
-            } catch (...) {
-            }
+            task();
         }
     }
 
