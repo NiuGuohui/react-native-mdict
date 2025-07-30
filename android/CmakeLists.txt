@@ -18,11 +18,11 @@ add_library(
 )
 
 # Add headers search paths
-target_include_directories(react-native-mdict PUBLIC ../mdict)
 target_include_directories(react-native-mdict PUBLIC ../cpp)
 
-# Add litehtml core dependency
-add_subdirectory(../mdict mdict)
+# Add mdict dependency
+add_library(mdict STATIC IMPORTED)
+set_target_properties(mdict PROPERTIES IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/libs/${ANDROID_ABI}/libmdict_core.a)
 
 # Add android/log dependency
 find_library(log-lib log)

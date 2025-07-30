@@ -1,6 +1,6 @@
 {
   "name": "react-native-mdict",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A mdict(*.mdx/mdd) file parser.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
@@ -18,7 +18,6 @@
     "android",
     "ios",
     "cpp",
-    "mdict",
     "*.podspec",
     "react-native.config.js",
     "!example",
@@ -157,6 +156,11 @@
     "includesGeneratedCode": false,
     "android": {
       "javaPackageName": "com.ollie.mdict"
+    },
+    "ios": {
+      "modulesProvider": {
+        "NativeMdictModule": "Mdict"
+      }
     }
   },
   "create-react-native-library": {

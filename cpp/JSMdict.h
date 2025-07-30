@@ -2,7 +2,7 @@
 
 #include <jsi/jsi.h>
 #include <ReactCommon/CallInvoker.h>
-#include <mdict.h>
+#include "mdict/mdict.h"
 #include "Promise.h"
 #include "CancellableThreadPool.h"
 

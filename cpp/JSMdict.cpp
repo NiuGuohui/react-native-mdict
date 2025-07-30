@@ -1,5 +1,4 @@
 #include "JSMdict.h"
-#include "mdict_extern.h"
 #include <string>
 
 namespace JSMdict {
