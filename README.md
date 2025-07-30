@@ -1,6 +1,6 @@
 # react-native-mdict
 
-A mdict(*.mdx/mdd) file parser.
+A mdict(*.mdx/mdd) file parser.(JSI version)
 
 ## Installation
 
@@ -12,12 +12,22 @@ npm install react-native-mdict
 
 
 ```js
-import { multiply } from 'react-native-mdict';
+import { Mdict } from 'react-native-mdict';
 
 // ...
+// Create mdict instance
+const mdict = new Mdict('xxx/Dictionary.mdx');
+// Init mdict
+await mdict.init();
+// Search and get result
+const res = await mdict.search('sadasd');
+// Get key list
+const list = await mdict.keyList('ab');
 
-const result = multiply(3, 7);
 ```
+
+### Tips
+Perhaps you have a need to render simple HTML, here is a solution: [react-native-litehtml](https://github.com/NiuGuohui/react-native-litehtml)
 
 
 ## Contributing
