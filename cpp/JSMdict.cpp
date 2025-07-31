@@ -1,9 +1,11 @@
 #include "JSMdict.h"
 #include <string>
+#include <thread>
+#include <utility>
 
 namespace JSMdict {
     JSMdict::JSMdict(std::string file, std::shared_ptr<react::CallInvoker> jsInvoker)
-            : mdict(new mdict::Mdict(file)),
+            : mdict(new mdict::Mdict(std::move(file))),
               jsInvoker(std::weak_ptr<react::CallInvoker>(jsInvoker)),
               threadPool(CancellableThreadPool(std::thread::hardware_concurrency())) {
     }
@@ -60,12 +62,12 @@ namespace JSMdict {
     }
 
     jsi::Value JSMdict::init(jsi::Runtime &runtime) {
-        return Promise::createPromise(runtime, jsInvoker.lock(), [&](const std::shared_ptr<Promise> &promise) {
-            threadPool.enqueue([&, promise]() {
+        return Promise::createPromise(runtime, jsInvoker.lock(), [this](const std::shared_ptr<Promise> &promise) {
+            threadPool.enqueue([this, promise]() {
                 try {
                     mdict->init();
                     initialized = true;
-                    promise->resolve(jsi::Value::undefined());
+                    promise->resolve(JSVariant(nullptr));
                 } catch (std::exception &e) {
                     promise->reject(e.what());
                 }
@@ -75,34 +77,36 @@ namespace JSMdict {
 
     jsi::Value JSMdict::lookup(jsi::Runtime &runtime, std::string value) {
         checkInitialized(runtime);
-        return Promise::createPromise(runtime, jsInvoker.lock(), [&, value](const std::shared_ptr<Promise> &promise) {
-            threadPool.enqueue([&, promise]() {
-                auto s = mdict->lookup(value);
-                if (s.empty()) promise->resolve(jsi::Value::undefined());
-                else promise->resolve(jsi::Value(runtime, jsi::String::createFromUtf8(runtime, s)));
-            });
-        });
+        return Promise::createPromise(
+                runtime,
+                jsInvoker.lock(),
+                [this, value](const std::shared_ptr<Promise> &promise) {
+                    threadPool.enqueue([this, value, promise]() {
+                        auto s = mdict->lookup(value);
+                        if (s.empty()) promise->resolve(JSVariant(nullptr));
+                        else promise->resolve(JSVariant(s));
+                    });
+                });
     }
 
     jsi::Value JSMdict::keyList(jsi::Runtime &runtime, std::string query) {
         checkInitialized(runtime);
-        return Promise::createPromise(runtime, jsInvoker.lock(), [&](const std::shared_ptr<Promise> &promise) {
-            threadPool.cancel(currentSearchTaskId);
-            currentSearchTaskId = threadPool.enqueue([&, promise, query]() {
-                auto list = std::vector<std::string>();
-                auto keys = mdict->keyList();
-                for (int i = 0; i < keys.size(); i++) {
-                    if (keys[i]->key_word.find(query) != std::string::npos) {
-                        list.insert(list.end(), keys[i]->key_word);
-                    }
-                }
-                jsi::Array arr(runtime, list.size());
-                for (int i = 0; i < list.size(); i++) {
-                    arr.setValueAtIndex(runtime, i, jsi::String::createFromAscii(runtime, list[i]));
-                }
-                promise->resolve(jsi::Value(runtime, arr));
-            });
-        });
+        return Promise::createPromise(
+                runtime,
+                jsInvoker.lock(),
+                [this, query](const std::shared_ptr<Promise> &promise) {
+                    threadPool.cancel(currentSearchTaskId);
+                    currentSearchTaskId = threadPool.enqueue([this, promise, query]() {
+                        auto list = std::vector<JSVariant>();
+                        auto keys = mdict->keyList();
+                        for (auto &key: keys) {
+                            if (key->key_word.find(query) != std::string::npos) {
+                                list.insert(list.end(), JSVariant(key->key_word));
+                            }
+                        }
+                        promise->resolve(JSVariant(list));
+                    });
+                });
     }
 
 }

@@ -19,9 +19,9 @@ import { Mdict } from 'react-native-mdict';
 const mdict = new Mdict('xxx/Dictionary.mdx');
 // Init mdict
 await mdict.init();
-// Search and get result
-const res = await mdict.search('sadasd');
-// Get key list
+// lookup and get result
+const res = await mdict.lookup('sadasd');
+// Search word with specific key
 const list = await mdict.keyList('ab');
 
 ```

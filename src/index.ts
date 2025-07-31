@@ -17,7 +17,7 @@ export class Mdict {
     return this.mdict.init();
   }
 
-  search(word: string): Promise<string> {
+  lookup(word: string): Promise<string> {
     return this.mdict.lookup(word);
   }
 
