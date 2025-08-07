@@ -14,7 +14,7 @@ export default function App() {
   }, []);
 
   const onSearch = useCallback(async () => {
-    const res = await mdict.current?.lookup('ab');
+    const res = await mdict.current?.keyList('aban');
     console.log(res);
   }, []);
 

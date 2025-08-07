@@ -89,6 +89,56 @@ namespace JSMdict {
                 });
     }
 
+    std::string toLower(std::string_view str) {
+        std::string result = std::string(str);
+        std::transform(result.begin(), result.end(), result.begin(), ::tolower);
+        return result;
+    }
+
+    int levenshteinDistance(const std::string &s1, const std::string &s2) {
+        size_t len1 = s1.size(), len2 = s2.size();
+        std::vector<std::vector<int>> dp(len1 + 1, std::vector<int>(len2 + 1));
+
+        for (size_t i = 0; i <= len1; ++i) dp[i][0] = i;
+        for (size_t j = 0; j <= len2; ++j) dp[0][j] = j;
+
+        for (size_t i = 1; i <= len1; ++i) {
+            for (size_t j = 1; j <= len2; ++j) {
+                dp[i][j] = std::min({dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + (s1[i - 1] != s2[j - 1])});
+            }
+        }
+
+        return dp[len1][len2];
+    }
+
+    int computeScore(const std::string &candidateOriginal, const std::string &queryOriginal) {
+        std::string candidate = toLower(candidateOriginal);
+        std::string query = toLower(queryOriginal);
+
+        if (candidate == query) return 100;
+        if (candidate.starts_with(query)) return 80;
+        if (candidate.find(query) != std::string::npos) return 50;
+        return std::max(0, 100 - levenshteinDistance(candidate, query) * 10);
+    }
+
+    std::vector<JSVariant> sortKeyListByKeywordRelevance(std::vector<mdict::key_list_item *> &items, const std::string &query) {
+        std::partial_sort(
+                items.begin(),
+                items.begin() + 10,
+                items.end(),
+                [&query](const mdict::key_list_item *a, const mdict::key_list_item *b) {
+                    int scoreA = computeScore(a->key_word, query);
+                    int scoreB = computeScore(b->key_word, query);
+                    return scoreA > scoreB || (scoreA == scoreB && a->record_start < b->record_start);
+                }
+        );
+        items.resize(10);
+        auto list = std::vector<JSVariant>();
+        for (auto item: items) list.push_back(JSVariant(item->key_word));
+        return list;
+    }
+
+
     jsi::Value JSMdict::keyList(jsi::Runtime &runtime, std::string query) {
         checkInitialized(runtime);
         return Promise::createPromise(
@@ -97,17 +147,16 @@ namespace JSMdict {
                 [this, query](const std::shared_ptr<Promise> &promise) {
                     threadPool.cancel(currentSearchTaskId);
                     currentSearchTaskId = threadPool.enqueue([this, promise, query]() {
-                        auto list = std::vector<JSVariant>();
+                        auto tmp = std::vector<mdict::key_list_item *>();
                         auto keys = mdict->keyList();
-                        for (auto &key: keys) {
-                            if (key->key_word.find(query) != std::string::npos) {
-                                list.insert(list.end(), JSVariant(key->key_word));
-                            }
-                        }
-                        promise->resolve(JSVariant(list));
+                        std::copy_if(keys.begin(), keys.end(), std::back_inserter(tmp), [&query](auto key) {
+                            return key->key_word.find(query) != std::string::npos;
+                        });
+                        keys.clear();
+                        promise->resolve(JSVariant(sortKeyListByKeywordRelevance(tmp, query)));
+                        tmp.clear();
                     });
                 });
     }
-
 }
 
