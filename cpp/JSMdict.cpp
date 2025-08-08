@@ -121,18 +121,19 @@ namespace JSMdict {
         return std::max(0, 100 - levenshteinDistance(candidate, query) * 10);
     }
 
-    std::vector<JSVariant> sortKeyListByKeywordRelevance(std::vector<mdict::key_list_item *> &items, const std::string &query) {
-        std::partial_sort(
-                items.begin(),
-                items.begin() + 10,
-                items.end(),
-                [&query](const mdict::key_list_item *a, const mdict::key_list_item *b) {
-                    int scoreA = computeScore(a->key_word, query);
-                    int scoreB = computeScore(b->key_word, query);
-                    return scoreA > scoreB || (scoreA == scoreB && a->record_start < b->record_start);
-                }
-        );
-        items.resize(10);
+    std::vector<JSVariant>
+    sortKeyListByKeywordRelevance(std::vector<mdict::key_list_item *> &items, const std::string &query) {
+        auto compare = [&query](const mdict::key_list_item *a, const mdict::key_list_item *b) {
+            int scoreA = computeScore(a->key_word, query);
+            int scoreB = computeScore(b->key_word, query);
+            return scoreA > scoreB || (scoreA == scoreB && a->record_start < b->record_start);
+        };
+        if (items.size() >= 10) {
+            std::partial_sort(items.begin(), items.begin() + 10, items.end(), compare);
+            items.resize(10);
+        } else {
+            std::sort(items.begin(), items.begin(), compare);
+        }
         auto list = std::vector<JSVariant>();
         for (auto item: items) list.push_back(JSVariant(item->key_word));
         return list;
@@ -154,7 +155,6 @@ namespace JSMdict {
                         });
                         keys.clear();
                         promise->resolve(JSVariant(sortKeyListByKeywordRelevance(tmp, query)));
-                        tmp.clear();
                     });
                 });
     }
